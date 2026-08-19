@@ -1,0 +1,13 @@
+services:
+  backend:
+    build: ./backend
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    environment:
+      CODETRACE_MAX_STEPS: "2000"
+    network_mode: none
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
