@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import subprocess
 from pathlib import Path
@@ -8,6 +9,10 @@ from app.schemas.trace import TraceResponse
 from app.services.compiler import compile_cpp
 from app.services.gdb_tracer import TraceLimit, trace_binary
 from app.services.runner import run_program
+
+
+def _limits() -> tuple[int, float]:
+    return int(os.environ.get("CODETRACE_MAX_STEPS", "2000")), float(os.environ.get("CODETRACE_MAX_SECONDS", "20"))
 
 
 def trace_cpp(code: str) -> TraceResponse:
@@ -23,10 +28,11 @@ def trace_cpp(code: str) -> TraceResponse:
         if not compiled:
             return TraceResponse(success=False, compile_error=stderr)
         stdout, timed_out = run_program(binary, source.with_suffix(".final_stdout"))
+        max_steps, max_seconds = _limits()
         try:
-            steps = trace_binary(binary, source)
+            steps = trace_binary(binary, source, max_steps=max_steps, max_seconds=max_seconds)
         except TraceLimit as limit:
-            return TraceResponse(success=True, steps=limit.steps, truncated=True, truncation_reason="Maximum step count or execution time exceeded")
+            return TraceResponse(success=True, steps=limit.steps, final_stdout=stdout, truncated=True, truncation_reason="Maximum step count or execution time exceeded")
         except Exception as error:
             return TraceResponse(success=False, compile_error=f"Execution failed: {error}")
         stdout_file = source.with_suffix(".stdout")

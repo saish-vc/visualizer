@@ -16,6 +16,8 @@ POST source code to `http://localhost:8000/api/trace` as `{ "code": "..." }`.
 
 For chat, copy `backend/.env.example` to `backend/.env` and set `NIM_API_KEY`. The actual `.env` file is ignored by Git and must never be committed.
 
+Tracing limits are configurable with `CODETRACE_MAX_STEPS` (default 2000) and `CODETRACE_MAX_SECONDS` (default 20).
+
 Snippets use local SQLite by default (`backend/codetrace.db`). Set `CODETRACE_DB_PATH` to use another location. The API stores source code only and recomputes its execution trace when loaded: `POST /api/snippets` then `GET /api/snippets/{id}`.
 
 ## CI and deployment
