@@ -24,6 +24,18 @@ CURRENT EXECUTION STATE:
 ```"""
 
 
+def _delta_content(data: str) -> str:
+    try:
+        payload = json.loads(data)
+    except json.JSONDecodeError:
+        return ""
+    choices = payload.get("choices") or []
+    if not choices:
+        return ""
+    delta = choices[0].get("delta") or {}
+    return str(delta.get("content") or "")
+
+
 def stream_chat(request: ChatRequest) -> Iterator[str]:
     api_key = os.environ.get("NIM_API_KEY")
     endpoint = os.environ.get("NIM_BASE_URL", "https://integrate.api.nvidia.com/v1")
@@ -35,18 +47,18 @@ def stream_chat(request: ChatRequest) -> Iterator[str]:
     messages.extend(message.model_dump() for message in request.history)
     messages.append({"role": "user", "content": request.message})
     try:
-        with httpx.stream("POST", f"{endpoint.rstrip('/')}/chat/completions", headers={"Authorization": f"Bearer {api_key}"}, json={"model": model, "messages": messages, "temperature": 0.2, "stream": True}, timeout=60.0) as response:
-            response.raise_for_status()
+        with httpx.stream("POST", f"{endpoint.rstrip('/')}/chat/completions", headers={"Authorization": f"Bearer {api_key}", "Accept": "text/event-stream"}, json={"model": model, "messages": messages, "temperature": 0.2, "stream": True}, timeout=60.0) as response:
+            if response.is_error:
+                response.read()
+                yield f"NIM request failed with status {response.status_code}: {response.text.strip()[:500]}"
+                return
             for line in response.iter_lines():
                 if not line.startswith("data:"):
                     continue
                 data = line[5:].strip()
                 if data == "[DONE]":
                     break
-                try:
-                    delta = json.loads(data).get("choices", [{}])[0].get("delta", {}).get("content")
-                except json.JSONDecodeError:
-                    continue
+                delta = _delta_content(data)
                 if delta:
                     yield delta
     except httpx.HTTPError as error:
